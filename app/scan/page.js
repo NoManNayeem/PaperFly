@@ -160,7 +160,7 @@ export default function ScanPage() {
           <h1 className="text-lg font-semibold">Scan Document</h1>
           <button
             onClick={handleSave}
-            disabled={!processedImage}
+            disabled={images.length === 0}
             className="touch-target p-2 text-primary-600 hover:text-primary-700 disabled:text-gray-400"
             aria-label="Save document"
           >
