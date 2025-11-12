@@ -185,6 +185,18 @@ export default function ScanPage() {
           </div>
         )}
       </div>
+
+      {/* Edge Selector Modal */}
+      {showEdgeSelector && processedImage && (
+        <EdgeSelector
+          image={processedImage}
+          onCrop={(croppedImage) => {
+            setProcessedImage(croppedImage)
+            setShowEdgeSelector(false)
+          }}
+          onCancel={() => setShowEdgeSelector(false)}
+        />
+      )}
     </div>
   )
 }
