@@ -63,7 +63,27 @@ This will generate static files in the `out` directory, ready for deployment.
 
 ### GitHub Pages
 
-The project is configured for automatic deployment to GitHub Pages using GitHub Actions. Simply push to the `main` branch and the workflow will build and deploy automatically.
+The project is configured for automatic deployment to GitHub Pages using GitHub Actions. 
+
+**Repository**: [https://github.com/NoManNayeem/PaperFly](https://github.com/NoManNayeem/PaperFly)
+
+**To enable GitHub Pages:**
+
+1. Go to your repository settings on GitHub
+2. Navigate to "Pages" in the left sidebar
+3. Under "Source", select "GitHub Actions"
+4. The workflow will automatically build and deploy on every push to `main`
+
+The application will be available at: `https://nomannayeem.github.io/PaperFly/`
+
+**Note**: Update `next.config.js` with your repository name if needed:
+```javascript
+const nextConfig = {
+  output: 'export',
+  basePath: '/PaperFly', // Add this if deploying to GitHub Pages subdirectory
+  // ...
+}
+```
 
 ### Manual Deployment
 
