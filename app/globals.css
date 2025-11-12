@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile viewport fixes */
+@supports (height: 100dvh) {
+  html, body {
+    height: 100dvh;
+  }
+}
+
+/* Ensure camera viewport works on mobile */
+.camera-container {
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100vh;
+}
+
+/* Safe area support for notched devices */
+@supports (padding: max(0px)) {
+  .camera-safe-area {
+    padding-top: max(0px, env(safe-area-inset-top));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+    padding-left: max(0px, env(safe-area-inset-left));
+  }
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;

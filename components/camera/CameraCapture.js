@@ -66,19 +66,45 @@ export default function CameraCapture({ onCapture, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black z-50 flex flex-col"
+      style={{
+        width: '100vw',
+        height: '100dvh', // Use dynamic viewport height for mobile
+        maxHeight: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
+    >
       {/* Camera View */}
-      <div className="flex-1 relative">
+      <div 
+        className="relative flex-1"
+        style={{
+          width: '100%',
+          height: '100%',
+          minHeight: 0, // Allow flexbox to shrink
+          overflow: 'hidden',
+        }}
+      >
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full"
           style={{ 
+            objectFit: 'cover',
+            objectPosition: 'center',
             transform: stream?.getVideoTracks()[0]?.getSettings().facingMode === 'user' 
               ? 'scaleX(-1)' 
-              : 'none' 
+              : 'none',
+            minWidth: '100%',
+            minHeight: '100%',
+            width: '100%',
+            height: '100%',
           }}
           onLoadedMetadata={() => {
             // Video metadata loaded
@@ -110,13 +136,24 @@ export default function CameraCapture({ onCapture, onClose }) {
         />
         
         {/* Overlay guides */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div 
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{
+            padding: 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
+          }}
+        >
           <div className="border-2 border-white border-dashed rounded-lg w-11/12 max-w-md aspect-[3/4] shadow-lg" />
         </div>
       </div>
 
       {/* Controls */}
-      <div className="bg-black bg-opacity-75 p-6">
+      <div 
+        className="bg-black bg-opacity-75 flex-shrink-0"
+        style={{
+          padding: '1.5rem',
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))', // Safe area for notches
+        }}
+      >
         <div className="flex items-center justify-center gap-6">
           {/* Switch Camera Button */}
           <button
