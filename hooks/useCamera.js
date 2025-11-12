@@ -6,8 +6,10 @@ export function useCamera() {
   const [stream, setStream] = useState(null)
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isVideoReady, setIsVideoReady] = useState(false)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const facingModeRef = useRef('environment')
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -23,6 +25,8 @@ export function useCamera() {
   const startCamera = useCallback(async (facingMode = 'environment') => {
     setIsLoading(true)
     setError(null)
+    setIsVideoReady(false)
+    facingModeRef.current = facingMode
 
     // Stop existing stream first
     stopCamera()
@@ -57,12 +61,38 @@ export function useCamera() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
-        // Wait for video to be ready
-        await new Promise((resolve) => {
-          if (videoRef.current.readyState >= 2) {
-            resolve()
+        setIsVideoReady(false)
+        
+        // Wait for video to be ready with metadata
+        await new Promise((resolve, reject) => {
+          const video = videoRef.current
+          if (!video) {
+            reject(new Error('Video element not available'))
+            return
+          }
+
+          const checkReady = () => {
+            if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+              setIsVideoReady(true)
+              resolve()
+            }
+          }
+
+          if (video.readyState >= 2) {
+            checkReady()
           } else {
-            videoRef.current.onloadedmetadata = () => resolve()
+            video.onloadedmetadata = () => {
+              checkReady()
+            }
+            video.onloadeddata = () => {
+              checkReady()
+            }
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              if (video.readyState < 2) {
+                reject(new Error('Video loading timeout'))
+              }
+            }, 5000)
           }
         })
       }
@@ -85,22 +115,57 @@ export function useCamera() {
   }, [stopCamera])
 
   const captureImage = useCallback(() => {
-    if (!videoRef.current || !streamRef.current) return null
-
-    const video = videoRef.current
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      console.error('Video not ready for capture')
+    if (!videoRef.current || !streamRef.current) {
+      console.error('Video ref or stream not available')
       return null
     }
 
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
+    const video = videoRef.current
+    
+    // Wait for video to be ready
+    if (video.readyState < 2) {
+      console.error('Video not ready (readyState:', video.readyState, ')')
+      return null
+    }
 
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    // Check if video has valid dimensions
+    const width = video.videoWidth || video.clientWidth
+    const height = video.videoHeight || video.clientHeight
+    
+    if (!width || !height || width === 0 || height === 0) {
+      console.error('Video dimensions not available:', { width, height })
+      return null
+    }
 
-    return canvas.toDataURL('image/jpeg', 0.9)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext('2d')
+      
+      // Check if video is mirrored (front camera), if so, flip it back
+      const currentFacingMode = streamRef.current?.getVideoTracks()[0]?.getSettings().facingMode
+      const isMirrored = currentFacingMode === 'user'
+      if (isMirrored) {
+        ctx.translate(width, 0)
+        ctx.scale(-1, 1)
+      }
+      
+      ctx.drawImage(video, 0, 0, width, height)
+
+      const imageData = canvas.toDataURL('image/jpeg', 0.9)
+      
+      if (!imageData || imageData === 'data:,') {
+        console.error('Failed to generate image data')
+        return null
+      }
+
+      return imageData
+    } catch (error) {
+      console.error('Error capturing image:', error)
+      return null
+    }
   }, [])
 
   // Cleanup on unmount
@@ -115,6 +180,7 @@ export function useCamera() {
     stream,
     error,
     isLoading,
+    isVideoReady,
     startCamera,
     stopCamera,
     captureImage,
