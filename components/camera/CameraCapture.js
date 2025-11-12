@@ -1,33 +1,39 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useCamera } from '@/hooks/useCamera'
 import { FaCamera, FaSyncAlt, FaStop } from 'react-icons/fa'
 
 export default function CameraCapture({ onCapture, onClose }) {
   const { videoRef, stream, error, isLoading, startCamera, stopCamera, captureImage } = useCamera()
+  const facingModeRef = useRef('environment')
 
   useEffect(() => {
-    startCamera('environment') // Use back camera by default
+    startCamera(facingModeRef.current) // Use back camera by default
     return () => {
       stopCamera()
     }
-  }, [startCamera, stopCamera])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount
 
   const handleCapture = () => {
+    if (!stream) {
+      console.error('No camera stream available')
+      return
+    }
     const imageData = captureImage()
     if (imageData && onCapture) {
       onCapture(imageData)
+    } else {
+      console.error('Failed to capture image')
     }
   }
 
-  const handleSwitchCamera = () => {
+  const handleSwitchCamera = async () => {
     stopCamera()
     // Toggle between front and back camera
-    const facingMode = stream?.getVideoTracks()[0]?.getSettings().facingMode === 'user' 
-      ? 'environment' 
-      : 'user'
-    startCamera(facingMode)
+    facingModeRef.current = facingModeRef.current === 'user' ? 'environment' : 'user'
+    await startCamera(facingModeRef.current)
   }
 
   if (error) {
@@ -57,6 +63,7 @@ export default function CameraCapture({ onCapture, onClose }) {
           playsInline
           muted
           className="w-full h-full object-cover"
+          style={{ transform: 'scaleX(-1)' }} // Mirror the video for better UX
         />
         
         {/* Overlay guides */}
