@@ -60,39 +60,86 @@ export function useCamera() {
       setStream(mediaStream)
 
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
+        const video = videoRef.current
+        video.srcObject = mediaStream
         setIsVideoReady(false)
         
-        // Wait for video to be ready with metadata
+        // Wait for video to be ready and playing
         await new Promise((resolve, reject) => {
-          const video = videoRef.current
           if (!video) {
             reject(new Error('Video element not available'))
             return
           }
 
+          let resolved = false
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              resolved = true
+              reject(new Error('Video loading timeout'))
+            }
+          }, 10000) // 10 second timeout
+
           const checkReady = () => {
+            // Check if video has valid dimensions and is ready to play
             if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-              setIsVideoReady(true)
-              resolve()
+              // Try to play the video (required for some mobile browsers)
+              const playPromise = video.play()
+              if (playPromise !== undefined) {
+                playPromise
+                  .then(() => {
+                    if (!resolved) {
+                      resolved = true
+                      clearTimeout(timeout)
+                      setIsVideoReady(true)
+                      resolve()
+                    }
+                  })
+                  .catch((playError) => {
+                    // Even if play fails, if video has dimensions, we can still capture
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                      if (!resolved) {
+                        resolved = true
+                        clearTimeout(timeout)
+                        setIsVideoReady(true)
+                        resolve()
+                      }
+                    } else {
+                      if (!resolved) {
+                        resolved = true
+                        clearTimeout(timeout)
+                        reject(new Error('Video play failed: ' + playError.message))
+                      }
+                    }
+                  })
+              } else {
+                // Fallback for browsers that don't return a promise
+                if (!resolved) {
+                  resolved = true
+                  clearTimeout(timeout)
+                  setIsVideoReady(true)
+                  resolve()
+                }
+              }
             }
           }
 
+          // Try immediate check
           if (video.readyState >= 2) {
             checkReady()
-          } else {
-            video.onloadedmetadata = () => {
-              checkReady()
-            }
-            video.onloadeddata = () => {
-              checkReady()
-            }
-            // Timeout after 5 seconds
-            setTimeout(() => {
-              if (video.readyState < 2) {
-                reject(new Error('Video loading timeout'))
-              }
-            }, 5000)
+          }
+
+          // Listen for multiple events to ensure we catch when video is ready
+          video.onloadedmetadata = () => {
+            checkReady()
+          }
+          video.onloadeddata = () => {
+            checkReady()
+          }
+          video.oncanplay = () => {
+            checkReady()
+          }
+          video.oncanplaythrough = () => {
+            checkReady()
           }
         })
       }
@@ -122,19 +169,21 @@ export function useCamera() {
 
     const video = videoRef.current
     
-    // Wait for video to be ready
+    // Wait for video to be ready (HAVE_CURRENT_DATA or higher)
     if (video.readyState < 2) {
       console.error('Video not ready (readyState:', video.readyState, ')')
       return null
     }
 
-    // Check if video has valid dimensions
-    const width = video.videoWidth || video.clientWidth
-    const height = video.videoHeight || video.clientHeight
+    // Use actual video dimensions (preferred) or fallback to element dimensions
+    let width = video.videoWidth
+    let height = video.videoHeight
     
+    // Fallback if video dimensions not available (shouldn't happen if video is ready)
     if (!width || !height || width === 0 || height === 0) {
-      console.error('Video dimensions not available:', { width, height })
-      return null
+      width = video.clientWidth || 640
+      height = video.clientHeight || 480
+      console.warn('Using fallback dimensions:', { width, height })
     }
 
     try {
@@ -144,20 +193,37 @@ export function useCamera() {
 
       const ctx = canvas.getContext('2d')
       
-      // Check if video is mirrored (front camera), if so, flip it back
+      // Ensure canvas context is valid
+      if (!ctx) {
+        console.error('Failed to get canvas context')
+        return null
+      }
+      
+      // Check if video is mirrored (front camera), if so, flip it back in captured image
       const currentFacingMode = streamRef.current?.getVideoTracks()[0]?.getSettings().facingMode
       const isMirrored = currentFacingMode === 'user'
+      
       if (isMirrored) {
+        // Flip horizontally for front camera
         ctx.translate(width, 0)
         ctx.scale(-1, 1)
       }
       
+      // Draw the video frame to canvas
       ctx.drawImage(video, 0, 0, width, height)
 
+      // Convert canvas to image data
       const imageData = canvas.toDataURL('image/jpeg', 0.9)
       
+      // Validate the image data
       if (!imageData || imageData === 'data:,') {
-        console.error('Failed to generate image data')
+        console.error('Failed to generate image data - empty result')
+        return null
+      }
+
+      // Check if image data is valid (should start with data:image)
+      if (!imageData.startsWith('data:image')) {
+        console.error('Invalid image data format:', imageData.substring(0, 50))
         return null
       }
 

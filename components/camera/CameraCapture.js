@@ -83,12 +83,29 @@ export default function CameraCapture({ onCapture, onClose }) {
           onLoadedMetadata={() => {
             // Video metadata loaded
             if (videoRef.current) {
-              console.log('Video ready:', {
+              console.log('Video metadata loaded:', {
                 width: videoRef.current.videoWidth,
                 height: videoRef.current.videoHeight,
                 readyState: videoRef.current.readyState
               })
             }
+          }}
+          onCanPlay={() => {
+            // Video can start playing
+            if (videoRef.current) {
+              console.log('Video can play:', {
+                width: videoRef.current.videoWidth,
+                height: videoRef.current.videoHeight,
+                readyState: videoRef.current.readyState
+              })
+            }
+          }}
+          onPlaying={() => {
+            // Video is playing
+            console.log('Video is playing')
+          }}
+          onError={(e) => {
+            console.error('Video error:', e)
           }}
         />
         
