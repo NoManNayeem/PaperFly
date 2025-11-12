@@ -7,9 +7,10 @@ import CameraCapture from '@/components/camera/CameraCapture'
 import ImageEditor from '@/components/scanner/ImageEditor'
 import OCRPanel from '@/components/scanner/OCRPanel'
 import AnnotationTools from '@/components/editor/AnnotationTools'
+import EdgeSelector from '@/components/scanner/EdgeSelector'
 import { autoCropDocument } from '@/lib/image-processing'
 import { saveDocument } from '@/lib/storage'
-import { FaArrowLeft, FaSave } from 'react-icons/fa'
+import { FaArrowLeft, FaSave, FaCrop } from 'react-icons/fa'
 
 export default function ScanPage() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function ScanPage() {
   const [ocrText, setOcrText] = useState('')
   const [documentTitle, setDocumentTitle] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showEdgeSelector, setShowEdgeSelector] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -133,6 +135,17 @@ export default function ScanPage() {
                 placeholder="Enter document title"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent touch-target"
               />
+            </div>
+
+            {/* Edge Selection Button */}
+            <div className="mb-4">
+              <button
+                onClick={() => setShowEdgeSelector(true)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg touch-target transition-colors flex items-center justify-center gap-2"
+              >
+                <FaCrop />
+                Select Edges Manually
+              </button>
             </div>
 
             {/* Image Editor */}

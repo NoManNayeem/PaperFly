@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   adjustBrightness,
   adjustContrast,
@@ -14,45 +14,104 @@ export default function ImageEditor({ image, onImageChange }) {
   const [contrast, setContrast] = useState(1)
   const [colorMode, setColorMode] = useState('color') // color, grayscale, blackwhite
   const [processedImage, setProcessedImage] = useState(image)
+  const originalImageRef = useRef(null)
+  const processingTimeoutRef = useRef(null)
+
+  // Store original image on mount or when image changes
+  useEffect(() => {
+    if (image && image !== originalImageRef.current) {
+      originalImageRef.current = image
+      setProcessedImage(image)
+    }
+  }, [image])
 
   useEffect(() => {
-    if (!image) return
+    if (!image || !originalImageRef.current) return
 
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
+    // Debounce processing to avoid too many recalculations
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current)
+    }
 
-      let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    processingTimeoutRef.current = setTimeout(() => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext('2d')
+          
+          if (!ctx) {
+            console.error('Failed to get canvas context')
+            return
+          }
 
-      // Apply brightness
-      if (brightness !== 0) {
-        imageData = adjustBrightness(imageData, brightness)
+          // Draw original image
+          ctx.drawImage(img, 0, 0)
+
+          // Get image data (creates a copy)
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          
+          // Create a new ImageData object for processing (don't mutate original)
+          const processedData = new ImageData(
+            new Uint8ClampedArray(imageData.data),
+            imageData.width,
+            imageData.height
+          )
+
+          // Apply brightness
+          if (brightness !== 0) {
+            const brightnessResult = adjustBrightness(processedData, brightness)
+            // Copy result back
+            processedData.data.set(brightnessResult.data)
+          }
+
+          // Apply contrast
+          if (contrast !== 1) {
+            const contrastResult = adjustContrast(processedData, contrast)
+            // Copy result back
+            processedData.data.set(contrastResult.data)
+          }
+
+          // Apply color mode
+          if (colorMode === 'grayscale') {
+            const grayscaleResult = convertToGrayscale(processedData)
+            processedData.data.set(grayscaleResult.data)
+          } else if (colorMode === 'blackwhite') {
+            const bwResult = convertToBlackWhite(processedData)
+            processedData.data.set(bwResult.data)
+          }
+
+          // Put processed image data back to canvas
+          ctx.putImageData(processedData, 0, 0)
+          
+          // Convert to image
+          const newImage = canvas.toDataURL('image/jpeg', 0.9)
+          setProcessedImage(newImage)
+          
+          if (onImageChange) {
+            onImageChange(newImage)
+          }
+        } catch (error) {
+          console.error('Error processing image:', error)
+        }
       }
 
-      // Apply contrast
-      if (contrast !== 1) {
-        imageData = adjustContrast(imageData, contrast)
+      img.onerror = () => {
+        console.error('Failed to load image for processing')
       }
 
-      // Apply color mode
-      if (colorMode === 'grayscale') {
-        imageData = convertToGrayscale(imageData)
-      } else if (colorMode === 'blackwhite') {
-        imageData = convertToBlackWhite(imageData)
-      }
+      img.src = originalImageRef.current
+    }, 150) // 150ms debounce
 
-      ctx.putImageData(imageData, 0, 0)
-      const newImage = canvas.toDataURL('image/jpeg', 0.9)
-      setProcessedImage(newImage)
-      if (onImageChange) {
-        onImageChange(newImage)
+    return () => {
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current)
       }
     }
-    img.src = image
   }, [image, brightness, contrast, colorMode, onImageChange])
 
   return (
